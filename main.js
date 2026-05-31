@@ -49,8 +49,12 @@ let isQuitting = false;
 // Splash timing: keep it up at least this long so the logo animation is seen,
 // even when the web app loads instantly.
 const SPLASH_MIN_MS = 2200;
+const UPDATE_DECISION_MS = 4000; // max wait for the update check before showing the app
 let splashStart = 0;
 let mainRevealed = false;
+let contentReady = false;
+let updateDecided = false;
+let updating = false;
 
 function createSplash() {
   splash = new BrowserWindow({
@@ -75,10 +79,23 @@ function createSplash() {
   splashStart = Date.now();
 }
 
-// Reveal the main window, holding the splash for its minimum on-screen time,
-// then fading it out. Idempotent — safe to call from several events.
-function revealMain() {
-  if (mainRevealed) return;
+// Drive the splash's update UI from the main process (no preload needed).
+function splashSay(state, pct) {
+  if (!splash || splash.isDestroyed()) return;
+  splash.webContents
+    .executeJavaScript(
+      `window.setUpdate && window.setUpdate(${JSON.stringify(state)}, ${Number(pct) || 0})`,
+    )
+    .catch(() => {});
+}
+
+// Reveal the main window once BOTH the web content is ready AND the update
+// check has resolved (no update / error / timeout) — and we're not mid-update.
+// Holds the splash for its minimum on-screen time, then fades it out.
+// Idempotent — safe to call from several events.
+function maybeReveal() {
+  if (mainRevealed || updating) return;
+  if (!contentReady || !updateDecided) return;
   mainRevealed = true;
   const wait = Math.max(0, SPLASH_MIN_MS - (Date.now() - splashStart));
   setTimeout(fadeOutSplash, wait);
@@ -115,14 +132,41 @@ function showMainNow() {
 }
 
 // ── Auto-update (GitHub Releases feed via electron-updater) ──
-// Only runs in packaged builds. Downloads in the background, then offers to
-// restart. Re-checks every 6h while the app stays open.
+// Only runs in packaged builds. If an update is found AT LAUNCH (while the
+// splash is still up), we hold the splash and show a live download bar on it,
+// then restart into the new version. If one is found LATER (app already open),
+// it downloads in the background and we ask politely to restart.
 function setupAutoUpdate() {
-  if (!app.isPackaged) return;
+  if (!app.isPackaged) {
+    updateDecided = true; // nothing to check in dev → don't block the reveal
+    return;
+  }
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
+  autoUpdater.on("update-available", () => {
+    // Only take over the splash if we're still on it (launch-time update).
+    if (!mainRevealed) {
+      updating = true;
+      splashSay("downloading", 0);
+    }
+  });
+
+  autoUpdater.on("download-progress", (p) => {
+    if (updating) splashSay("downloading", p.percent);
+  });
+
   autoUpdater.on("update-downloaded", (info) => {
+    if (updating) {
+      // Splash path: finish the bar, then auto-restart into the new build.
+      splashSay("ready", 100);
+      setTimeout(() => {
+        isQuitting = true;
+        autoUpdater.quitAndInstall();
+      }, 1100);
+      return;
+    }
+    // Background path (update found while already running): ask first.
     const choice = dialog.showMessageBoxSync(mainWindow, {
       type: "info",
       buttons: ["Restart now", "Later"],
@@ -138,11 +182,31 @@ function setupAutoUpdate() {
     }
   });
 
-  autoUpdater.on("error", (err) => {
-    console.error("[auto-update]", err == null ? "unknown" : err.message || err);
+  autoUpdater.on("update-not-available", () => {
+    updateDecided = true;
+    maybeReveal();
   });
 
-  autoUpdater.checkForUpdates().catch(() => {});
+  autoUpdater.on("error", (err) => {
+    console.error("[auto-update]", err == null ? "unknown" : err.message || err);
+    // Don't trap the user on the splash if the download/check fails.
+    updating = false;
+    updateDecided = true;
+    maybeReveal();
+  });
+
+  // If the check is slow or GitHub is unreachable, stop waiting and show the app.
+  setTimeout(() => {
+    if (!updating) {
+      updateDecided = true;
+      maybeReveal();
+    }
+  }, UPDATE_DECISION_MS);
+
+  autoUpdater.checkForUpdates().catch(() => {
+    updateDecided = true;
+    maybeReveal();
+  });
   setInterval(
     () => autoUpdater.checkForUpdates().catch(() => {}),
     6 * 60 * 60 * 1000,
@@ -173,9 +237,20 @@ function createWindow() {
 
   // Swap splash → app once the web content is ready to paint. The fallback
   // guarantees the window appears even if the load stalls.
-  mainWindow.once("ready-to-show", revealMain);
-  mainWindow.webContents.once("did-finish-load", revealMain);
-  setTimeout(revealMain, 15000);
+  mainWindow.once("ready-to-show", () => {
+    contentReady = true;
+    maybeReveal();
+  });
+  mainWindow.webContents.once("did-finish-load", () => {
+    contentReady = true;
+    maybeReveal();
+  });
+  // Hard fallback: never get stuck on the splash.
+  setTimeout(() => {
+    contentReady = true;
+    updateDecided = true;
+    maybeReveal();
+  }, 20000);
 
   // Open external links (other origins, target=_blank) in the system browser
   // instead of inside the app shell.

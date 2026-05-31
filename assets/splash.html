@@ -86,6 +86,26 @@
       box-shadow: 0 0 12px rgba(40,90,255,.8);
       animation: slide 1.25s ease-in-out infinite;
     }
+    /* Real progress fill (shown while an update downloads). */
+    .fill {
+      position: absolute; top: 0; left: 0; height: 100%;
+      width: 0;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--blue), var(--blue-soft));
+      box-shadow: 0 0 12px rgba(40,90,255,.9);
+      transition: width .22s ease;
+      display: none;
+    }
+    .bar.determinate::before { display: none; }    /* hide the shimmer */
+    .bar.determinate .fill   { display: block; }
+    .status {
+      min-height: 14px;
+      font-size: 12px; font-weight: 600; letter-spacing: .03em;
+      color: #9fb0ff;
+      opacity: 0; transform: translateY(6px);
+      transition: opacity .3s ease, transform .3s ease;
+    }
+    .status.show { opacity: 1; transform: translateY(0); }
 
     @keyframes cardIn {
       from { opacity: 0; transform: scale(.92); }
@@ -135,7 +155,29 @@
       <img class="logo" src="logo.svg" alt="Rambow" />
     </div>
     <div class="wordmark">Rambow</div>
-    <div class="bar"></div>
+    <div class="bar"><div class="fill"></div></div>
+    <div class="status"></div>
   </div>
+  <script>
+    // Called from the main process (via executeJavaScript) when an update is
+    // being downloaded at launch. Switches the loading bar from its indeterminate
+    // shimmer to a real progress fill and shows a status line.
+    window.setUpdate = function (state, pct) {
+      var bar = document.querySelector(".bar");
+      var fill = document.querySelector(".fill");
+      var status = document.querySelector(".status");
+      if (!bar || !fill || !status) return;
+      bar.classList.add("determinate");
+      if (state === "ready") {
+        fill.style.width = "100%";
+        status.textContent = "Restarting…";
+      } else {
+        var p = Math.max(0, Math.min(100, pct || 0));
+        fill.style.width = p + "%";
+        status.textContent = "Updating… " + Math.round(p) + "%";
+      }
+      status.classList.add("show");
+    };
+  </script>
 </body>
 </html>
