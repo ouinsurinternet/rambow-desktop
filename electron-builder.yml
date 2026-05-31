@@ -34,9 +34,11 @@ win:
   artifactName: ${productName}-Setup-${version}.${ext}
 
 nsis:
-  oneClick: false
+  # One-click, per-user install (Discord-style): no wizard, no admin/UAC prompt,
+  # and — crucially — auto-updates install SILENTLY (no installer window pops up
+  # on update). Installs to %LOCALAPPDATA%\Programs and relaunches.
+  oneClick: true
   perMachine: false
-  allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: Rambow
