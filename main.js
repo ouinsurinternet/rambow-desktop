@@ -15,6 +15,7 @@ const {
   desktopCapturer,
   nativeImage,
   dialog,
+  ipcMain,
 } = require("electron");
 const path = require("path");
 const { autoUpdater } = require("electron-updater");
@@ -131,6 +132,21 @@ function showMainNow() {
   }
 }
 
+// IPC for the custom title bar's minimize / maximize / close buttons.
+// Registered once; close keeps the existing "hide to tray" behaviour.
+function wireWindowControls() {
+  ipcMain.on("win:minimize", () => mainWindow && mainWindow.minimize());
+  ipcMain.on("win:toggle-maximize", () => {
+    if (!mainWindow) return;
+    if (mainWindow.isMaximized()) mainWindow.unmaximize();
+    else mainWindow.maximize();
+  });
+  ipcMain.on("win:close", () => mainWindow && mainWindow.close());
+  ipcMain.handle("win:is-maximized", () =>
+    mainWindow ? mainWindow.isMaximized() : false,
+  );
+}
+
 // ── Auto-update (GitHub Releases feed via electron-updater) ──
 // Only runs in packaged builds. If an update is found AT LAUNCH (while the
 // splash is still up), we hold the splash and show a live download bar on it,
@@ -223,6 +239,7 @@ function createWindow() {
     minHeight: 560,
     backgroundColor: THEME_BG,
     autoHideMenuBar: true,
+    frame: false, // custom title bar drawn by the web app (Discord-style)
     show: false, // stays hidden behind the splash until the web app is ready
     title: "Rambow",
     icon: path.join(__dirname, "build", "icon.png"),
@@ -253,6 +270,14 @@ function createWindow() {
     updateDecided = true;
     maybeReveal();
   }, 20000);
+
+  // Tell the custom title bar when the maximize state changes (icon swap).
+  mainWindow.on("maximize", () =>
+    mainWindow.webContents.send("win:maximized", true),
+  );
+  mainWindow.on("unmaximize", () =>
+    mainWindow.webContents.send("win:maximized", false),
+  );
 
   // Open external links (other origins, target=_blank) in the system browser
   // instead of inside the app shell.
@@ -383,6 +408,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(() => {
     wireMediaPermissions();
+    wireWindowControls();
     createSplash();
     createWindow();
     createTray();

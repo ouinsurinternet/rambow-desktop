@@ -1,7 +1,7 @@
-// Minimal, safe bridge. Exposes a tiny read-only API the web app can use to
-// detect it's running inside the desktop shell (e.g. to show native-only UI).
-// Keep this surface small — no Node access leaks to the page.
-const { contextBridge } = require("electron");
+// Minimal, safe bridge. Exposes a tiny read-only API plus window controls for
+// the custom title bar the web app draws when it detects it's in the desktop
+// shell. Keep this surface small — no Node access leaks to the page.
+const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("rambowDesktop", {
   isDesktop: true,
@@ -10,5 +10,18 @@ contextBridge.exposeInMainWorld("rambowDesktop", {
     electron: process.versions.electron,
     chrome: process.versions.chrome,
     node: process.versions.node,
+  },
+  // Window controls for the custom (frameless) title bar.
+  window: {
+    minimize: () => ipcRenderer.send("win:minimize"),
+    toggleMaximize: () => ipcRenderer.send("win:toggle-maximize"),
+    close: () => ipcRenderer.send("win:close"),
+    isMaximized: () => ipcRenderer.invoke("win:is-maximized"),
+    // Subscribe to maximize/unmaximize; returns an unsubscribe fn.
+    onMaximizeChange: (cb) => {
+      const handler = (_e, value) => cb(!!value);
+      ipcRenderer.on("win:maximized", handler);
+      return () => ipcRenderer.removeListener("win:maximized", handler);
+    },
   },
 });
