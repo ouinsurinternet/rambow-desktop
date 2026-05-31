@@ -159,10 +159,12 @@ function setupAutoUpdate() {
   autoUpdater.on("update-downloaded", (info) => {
     if (updating) {
       // Splash path: finish the bar, then auto-restart into the new build.
+      // quitAndInstall(true, true) → silent install (no NSIS progress window) +
+      // relaunch, so the whole update is just our splash bar then the new app.
       splashSay("ready", 100);
       setTimeout(() => {
         isQuitting = true;
-        autoUpdater.quitAndInstall();
+        autoUpdater.quitAndInstall(true, true);
       }, 1100);
       return;
     }
@@ -178,7 +180,7 @@ function setupAutoUpdate() {
     });
     if (choice === 0) {
       isQuitting = true;
-      autoUpdater.quitAndInstall();
+      autoUpdater.quitAndInstall(true, true);
     }
   });
 
