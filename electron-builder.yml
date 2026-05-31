@@ -1,0 +1,46 @@
+appId: com.rambow.desktop
+productName: Rambow
+copyright: Copyright © 2026 Rambow
+
+# Auto-update feed: GitHub Releases. `release:win` builds + uploads latest.yml,
+# the installer and its .blockmap to a release in this repo; electron-updater
+# in the app reads them. Public repo → update downloads need no token.
+publish:
+  provider: github
+  owner: ouinsurinternet
+  repo: rambow-desktop
+
+directories:
+  output: dist
+  buildResources: build
+
+# Only what the runtime needs — keeps the package small.
+files:
+  - main.js
+  - preload.js
+  - package.json
+  - assets/**
+
+# Don't ship dev-only stuff.
+asar: true
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  icon: build/icon.ico
+  artifactName: ${productName}-Setup-${version}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Rambow
+  deleteAppDataOnUninstall: false
+
+portable:
+  artifactName: ${productName}-Portable-${version}.${ext}

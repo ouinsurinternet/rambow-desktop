@@ -1,0 +1,24 @@
+{
+  "name": "rambow-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Rambow desktop — Electron shell around the Rambow web app",
+  "author": "Rambow",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist:win": "electron-builder --win",
+    "release:win": "electron-builder --win --publish always",
+    "make:icon": "node scripts/make-icon.js"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "jimp": "^0.22.12",
+    "png-to-ico": "^2.1.8"
+  }
+}

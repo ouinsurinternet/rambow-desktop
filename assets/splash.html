@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <style>
+    :root {
+      --blue: #1838ff;
+      --blue-soft: #5b7cff;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      background: transparent;
+      overflow: hidden;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      -webkit-user-select: none;
+      cursor: default;
+    }
+    /* The rounded card (window itself is transparent). */
+    .card {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 26px;
+      border-radius: 22px;
+      background:
+        radial-gradient(120% 90% at 50% 28%, #131a44 0%, #0a0e2a 46%, #060a1f 100%);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
+      animation: cardIn 520ms cubic-bezier(.2,.8,.2,1) both;
+    }
+    /* Soft drifting blue aura behind the logo. */
+    .aura {
+      position: absolute; top: 30%; left: 50%;
+      width: 240px; height: 240px;
+      transform: translate(-50%, -50%);
+      background: radial-gradient(circle, rgba(40,90,255,.55), rgba(40,90,255,0) 62%);
+      filter: blur(8px);
+      animation: auraPulse 2.6s ease-in-out infinite;
+      pointer-events: none;
+    }
+    .logo-wrap {
+      position: relative;
+      animation: float 3.4s ease-in-out infinite;
+    }
+    .logo {
+      width: 116px; height: auto;
+      display: block;
+      animation:
+        pop 900ms cubic-bezier(.18,1.25,.4,1) both,
+        glow 2.6s ease-in-out 900ms infinite;
+    }
+    /* sweeping shine across the logo right after it spawns */
+    .logo-wrap::after {
+      content: "";
+      position: absolute; inset: -10% -30%;
+      background: linear-gradient(75deg, transparent 42%, rgba(255,255,255,.55) 50%, transparent 58%);
+      mix-blend-mode: screen;
+      transform: translateX(-120%);
+      animation: sheen 1400ms ease-in-out 700ms 1 both;
+      pointer-events: none;
+    }
+    .wordmark {
+      font-size: 22px; font-weight: 800; letter-spacing: .14em;
+      text-transform: uppercase;
+      color: #fff;
+      opacity: 0;
+      animation: rise 700ms ease 560ms both;
+      text-shadow: 0 0 18px rgba(40,90,255,.6);
+    }
+    /* indeterminate loading bar */
+    .bar {
+      position: relative;
+      width: 132px; height: 3px;
+      border-radius: 3px;
+      background: rgba(255,255,255,.08);
+      overflow: hidden;
+      opacity: 0;
+      animation: rise 700ms ease 760ms both;
+    }
+    .bar::before {
+      content: "";
+      position: absolute; top: 0; left: 0; height: 100%;
+      width: 42%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--blue), var(--blue-soft));
+      box-shadow: 0 0 12px rgba(40,90,255,.8);
+      animation: slide 1.25s ease-in-out infinite;
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: scale(.92); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    @keyframes pop {
+      0%   { transform: scale(.35) rotate(-8deg); opacity: 0; filter: blur(10px); }
+      60%  { transform: scale(1.1) rotate(2deg);  opacity: 1; filter: blur(0); }
+      100% { transform: scale(1) rotate(0);        opacity: 1; }
+    }
+    @keyframes glow {
+      0%,100% { filter: drop-shadow(0 0 14px rgba(24,56,255,.45)); }
+      50%     { filter: drop-shadow(0 0 30px rgba(91,124,255,.95)); }
+    }
+    @keyframes float {
+      0%,100% { transform: translateY(0); }
+      50%     { transform: translateY(-7px); }
+    }
+    @keyframes auraPulse {
+      0%,100% { opacity: .55; transform: translate(-50%,-50%) scale(.9); }
+      50%     { opacity: 1;   transform: translate(-50%,-50%) scale(1.12); }
+    }
+    @keyframes sheen {
+      to { transform: translateX(120%); }
+    }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slide {
+      0%   { left: -45%; }
+      100% { left: 100%; }
+    }
+    /* Exit: main.js adds .leaving just before the window fades out. */
+    body.leaving .card {
+      animation: cardOut 320ms ease forwards;
+    }
+    @keyframes cardOut {
+      to { opacity: 0; transform: scale(1.04); }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <span class="aura"></span>
+    <div class="logo-wrap">
+      <img class="logo" src="logo.svg" alt="Rambow" />
+    </div>
+    <div class="wordmark">Rambow</div>
+    <div class="bar"></div>
+  </div>
+</body>
+</html>
