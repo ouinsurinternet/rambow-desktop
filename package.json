@@ -1,6 +1,6 @@
 {
   "name": "rambow-desktop",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "private": true,
   "description": "Rambow desktop — Electron shell around the Rambow web app",
   "author": "Rambow",
