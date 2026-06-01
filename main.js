@@ -42,6 +42,13 @@ if (APP_ORIGIN.startsWith("http://")) {
   app.commandLine.appendSwitch("disable-features", "BlockInsecurePrivateNetworkRequests");
 }
 
+// Windows attributes native (toast) notifications to an app via its
+// AppUserModelID. Without this it falls back to "Electron"; setting it to our
+// appId — which the NSIS installer also stamps on the "Rambow" shortcut — makes
+// notifications show "Rambow" with our icon. No-op on macOS/Linux. We do NOT
+// call app.setName(): that would move the userData dir and log existing users out.
+app.setAppUserModelId("com.rambow.desktop");
+
 let mainWindow = null;
 let splash = null;
 let tray = null;
