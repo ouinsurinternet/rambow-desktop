@@ -11,6 +11,12 @@ contextBridge.exposeInMainWorld("rambowDesktop", {
     chrome: process.versions.chrome,
     node: process.versions.node,
   },
+  // Screen-share source picker. getScreenSources() lists screens + windows
+  // (with thumbnails) for the in-app picker; pickScreenSource() records the
+  // user's choice so the next getDisplayMedia hands back exactly that source.
+  getScreenSources: () => ipcRenderer.invoke("desktop:get-sources"),
+  pickScreenSource: (id, audio) =>
+    ipcRenderer.invoke("desktop:pick-source", { id, audio }),
   // Window controls for the custom (frameless) title bar.
   window: {
     minimize: () => ipcRenderer.send("win:minimize"),

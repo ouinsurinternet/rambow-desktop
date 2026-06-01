@@ -335,6 +335,16 @@ function errorPage(desc) {
 }
 
 // ── Media permissions + screen-share source picker ──
+//
+// The web app draws its OWN themed picker (Discord-style: a grid of screens +
+// windows with live thumbnails and a "share audio" toggle). The flow:
+//   1. renderer calls getScreenSources() → we enumerate via desktopCapturer;
+//   2. user picks → renderer calls pickScreenSource(id, audio), stashed below;
+//   3. renderer asks LiveKit to share → getDisplayMedia fires → our handler
+//      hands back exactly that source (no OS picker).
+// The stash is consumed once, so a stale choice can't leak into a later share.
+let pendingScreenChoice = null; // { id, audio } | null
+
 function wireMediaPermissions() {
   const ses = session.defaultSession;
 
@@ -352,22 +362,58 @@ function wireMediaPermissions() {
   });
   ses.setPermissionCheckHandler(() => true);
 
-  // getDisplayMedia → hand back a screen source. v1 picks the primary screen;
-  // a richer in-app source picker can replace this later.
-  ses.setDisplayMediaRequestHandler(
-    (_request, callback) => {
-      desktopCapturer
-        .getSources({ types: ["screen", "window"] })
-        .then((sources) => {
-          const primary =
-            sources.find((s) => s.id.startsWith("screen")) || sources[0];
-          if (primary) callback({ video: primary, audio: "loopback" });
-          else callback(); // no source → cancels gracefully
-        })
-        .catch(() => callback());
-    },
-    { useSystemPicker: true },
-  );
+  // List capturable screens + windows with thumbnails + app icons for the
+  // in-app picker. Thumbnails come back as data URLs so the renderer can show
+  // them directly (no extra IPC round-trips).
+  ipcMain.handle("desktop:get-sources", async () => {
+    try {
+      const sources = await desktopCapturer.getSources({
+        types: ["screen", "window"],
+        thumbnailSize: { width: 320, height: 200 },
+        fetchWindowIcons: true,
+      });
+      return sources.map((s) => ({
+        id: s.id,
+        name: s.name,
+        type: s.id.startsWith("screen") ? "screen" : "window",
+        thumbnail: s.thumbnail.isEmpty() ? null : s.thumbnail.toDataURL(),
+        appIcon:
+          s.appIcon && !s.appIcon.isEmpty() ? s.appIcon.toDataURL() : null,
+      }));
+    } catch {
+      return [];
+    }
+  });
+
+  // Renderer records its choice just before asking LiveKit to share.
+  ipcMain.handle("desktop:pick-source", (_e, choice) => {
+    pendingScreenChoice =
+      choice && typeof choice.id === "string"
+        ? { id: choice.id, audio: !!choice.audio }
+        : null;
+    return true;
+  });
+
+  // getDisplayMedia → hand back the source the user just chose in our picker.
+  // `audio: "loopback"` captures system sound (Windows) when they opted in.
+  // Falls back to the primary screen if no choice is pending (e.g. a stray
+  // getDisplayMedia call), and cancels gracefully if there's nothing to share.
+  ses.setDisplayMediaRequestHandler((_request, callback) => {
+    const choice = pendingScreenChoice;
+    pendingScreenChoice = null; // consume once
+    desktopCapturer
+      .getSources({ types: ["screen", "window"] })
+      .then((sources) => {
+        const picked =
+          (choice && sources.find((s) => s.id === choice.id)) ||
+          sources.find((s) => s.id.startsWith("screen")) ||
+          sources[0];
+        if (!picked) return callback(); // nothing to share → cancel
+        const wantAudio = choice ? choice.audio : true;
+        callback({ video: picked, audio: wantAudio ? "loopback" : undefined });
+      })
+      .catch(() => callback());
+  });
 }
 
 function createTray() {
